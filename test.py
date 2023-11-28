@@ -7,16 +7,28 @@ import time
 from dotenv import load_dotenv
 import warnings
 import argparse
+import boto3
+import json
+from abc import ABC
 warnings.filterwarnings("ignore")
 
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
+brt = boto3.client(service_name='bedrock-runtime', region_name = "us-east-1")
+
 
 ### Add argument parser here is necessary (define the system prompt)
 
+class LLM(ABC): 
 
-class GPT4(object):
+    def __init__(self):
+        pass
+
+    def predict(self, prompt):
+        raise NotImplementedError
+
+class GPT4(LLM):
 
     def __init__(self):
         pass
@@ -24,7 +36,7 @@ class GPT4(object):
     def predict(self, prompt):
 
         response = openai.ChatCompletion.create(
-                     model="gpt-4",
+                     model="gpt-3.5-turbo",
                     messages=[{"role": "system", "content":  """
         You are a helpful assistant to suggest potential causal pairs with direction (A -> B means A causes B)
         """},
@@ -35,22 +47,85 @@ class GPT4(object):
         answer = response["choices"][0]["message"]["content"]
         return answer
 
+class Claude2(LLM):
+
+    def __init__(self):
+        pass
+    
+    def predict(self, prompt):
+        body = json.dumps({
+        "prompt": "\n\nHuman: {}\n\nAssistant:".format(prompt),
+        "max_tokens_to_sample": 300,
+        "temperature": 0,
+        "top_p": 0.9,
+        })
+        modelId = 'anthropic.claude-v2'
+        accept = 'application/json'
+        contentType = 'application/json'
+        response = brt.invoke_model(body=body, modelId=modelId, accept=accept, contentType=contentType)
+        response_body = json.loads(response.get('body').read())
+        return response_body.get('completion')
+    
+
+class Jurassic(LLM):
+
+    def __init__(self):
+        pass
+
+    def predict(self, prompt):
+        
+        body = json.dumps({
+        "prompt": "\n\nHuman: {}\n\nAssistant:".format(prompt),
+        "maxTokens": 200,
+        "temperature": 0,
+        "topP": 0.5
+        })
+        modelId = 'ai21.j2-mid-v1'
+        accept = 'application/json'
+        contentType = 'application/json'
+        response = brt.invoke_model(body=body, modelId=modelId, accept=accept, contentType=contentType)
+        response_body = json.loads(response.get('body').read())
+        
+        return response_body.get('completions')[0].get('data').get('text')
+    
+
+class Llama2(LLM):
+
+    def __init__(self):
+        pass 
+
+    def predict(self, prompt):
+        body = json.dumps({
+        "prompt":  "\n\nHuman: {}\n\nAssistant:".format(prompt),
+        "max_gen_len": 128,
+        "temperature": 0,
+        "top_p": 0.9,
+        })
+        modelId = 'meta.llama2-13b-chat-v1'
+        accept = 'application/json'
+        contentType = 'application/json'
+        response = brt.invoke_model(body=body, modelId=modelId, accept=accept, contentType=contentType)
+
+        return json.loads(response.get('body').read())['generation']
+
+
 
 def main():
 
     time1 = time.time()
-    galton = pd.read_csv(
-    "cmu.edu_dietrich_causality_assets_data_Galton_processed.txt", sep="\t")
-    data = galton.drop(['family'], axis=1).reset_index(drop=True)
-    data.columns = ["Father's Height",
-                "Mother's Height", "Gender", "Child's Height"]
-    relations = [("Father's Height", "Child's Height"), ("Mother's Height", "Child's Height"),
-                 ("Gender", "Child's Height")]
-    Llm = GPT4()
+    sachs = pd.read_csv("sachs.txt", sep="\t")
 
-    eval = causal_eval(data, relations, Llm)
+    relations = [("erk", "akt"), ("mek", "erk"), ("pip2", "pkc"), ("pip3", "akt"),
+                 ("pip3", "pip2"), ("pip3", "plc"), ("pka", "akt"), ("pka", "erk"), ("pka", "jnk"),
+                 ("pka", "mek"), ("pka", "p38"), ("pka", "raf"), ("pkc", "jnk"),
+                 ("pkc", "mek"), ("pkc", "p38"), ("pkc", "pka"), ("pkc", "raf"),
+                 ("plc", "pip2"), ("plc", "pkc"), ("raf", 'mek')]
+    
+    Llm = Claude2()
 
-    print(eval.evaluate(10, 8000, 0.5))
+    eval = causal_eval(sachs, relations, Llm)
+
+    print(eval.evaluate(15, 8000, 0.5))
     time2 = time.time()
 
     print(time2 - time1)

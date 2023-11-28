@@ -123,11 +123,11 @@ class causal_eval(object):
     
     def calculate_tdr_fdr(self, prompt, true_pairs):
         """
-        return tdr and fdr through GPT-4
+        return tdr and fdr through GPT-4 turbo
         """
         predicted_pairs = self.predict(prompt)
         response = openai.ChatCompletion.create(
-                     model="gpt-4",
+                     model="gpt-4-1106-preview",
                     messages=[{"role": "system", "content": "You are a helpful assistant to calculate True discovery rate and False discovery rate (Ignore small spelling error and Letter case issue)"},
                     {"role": "user", "content": f"""
                      Cacluate the true discovery rate and false discovery rate: \n Correct pairs: {true_pairs} \n Predicted pairs: {predicted_pairs}
@@ -172,16 +172,26 @@ class causal_eval(object):
         with ThreadPoolExecutor(max_workers = 3) as executor:
             fu1 = executor.submit(self.calculate_tdr_fdr, prompt1, self.correct_relations)
             fu2 = executor.submit(self.calculate_tdr_fdr, prompt2, self.correct_relations)
-            fu3 = executor.submit(self.calculate_tdr_fdr, prompt3, self.correct_relations)
-            fu4 = executor.submit(self.calculate_tdr_fdr, prompt4, self.correct_relations)
-            fu5 = executor.submit(self.calculate_tdr_fdr, prompt4, self.reversed_relations)
+            fu3 = executor.submit(self.calculate_tdr_fdr, prompt3, self.fake_relations)
+            fu4 = executor.submit(self.calculate_tdr_fdr, prompt4, self.reversed_relations)
+            fu5 = executor.submit(self.calculate_tdr_fdr, prompt4, self.correct_relations)
             fu6 = executor.submit(self.calculate_tdr_fdr, prompt6, self.fake_relations)  
         
             executor.shutdown()
-             
+
             return {1: {"tdr": fu1.result()[0], "fdr": fu1.result()[1]}, 2: {"tdr": fu2.result()[0], "fdr": fu2.result()[1]}, 
-                3: {"tdr": fu3.result()[0], "fdr": fu3.result()[1]}, 4: {"tdr": fu4.result()[0], "fdr": fu1.result()[1]},
-                5: {"tdr": fu5.result()[0], "fdr": fu5.result()[1]}, 6: {"tdr": fu6.result()[0], "fdr": fu6.result()[1]}}    
+                3: {"tdr": fu3.result()[0], "fdr": fu3.result()[1]}, 4: {"tdr": fu4.result()[0], "fdr": fu4.result()[1]},
+                5: {"tdr": fu5.result()[0], "fdr": fu5.result()[1]}, 6: {"tdr": fu6.result()[0], "fdr": fu6.result()[1]}}  
+
+    def calculate_F1(self, tdr, fdr):
+        """
+        :param tdr: true discovery rate for one time run 
+        :param fdr: false discovery rate for one time run
+
+        calculate the f1 score 
+        """  
+        f1 = 2 * (1 - fdr) * tdr / (1 - fdr + tdr + 1e-5)
+        return f1
         
     
     def evaluate(self, count, max_tokens, reserved_ratio = 0.8):
@@ -194,7 +204,7 @@ class causal_eval(object):
         """
         self.truncate_data(max_tokens, reserved_ratio)
         results = []
-        with ProcessPoolExecutor(max_workers = 3 ) as executor:
+        with ProcessPoolExecutor(max_workers = 3) as executor:
             future_to_result = [executor.submit(self.evaluate_once,  i) for i in range(count)]
             for fut in as_completed(future_to_result):
                 try:
@@ -207,6 +217,8 @@ class causal_eval(object):
         for key in average_result.keys():
             average_result[key]["tdr"] = (np.mean([data[key]["tdr"] for data in results]), np.std([data[key]["tdr"] for data in results]))
             average_result[key]["fdr"] = (np.mean([data[key]["fdr"] for data in results]), np.std([data[key]["fdr"] for data in results]))
+            average_result[key]["F1"] = (np.mean([self.calculate_F1(data[key]["tdr"], data[key]["fdr"]) for data in results]),
+                                          np.std([self.calculate_F1(data[key]["tdr"], data[key]["fdr"]) for data in results]))
         CAK = average_result[1]["tdr"][0] - average_result[3]["tdr"][0]
         CAD = average_result[1]["tdr"][0] - average_result[2]["tdr"][0]
         MAD = average_result[3]["tdr"][0] - average_result[6]["tdr"][0]
