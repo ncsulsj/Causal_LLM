@@ -178,7 +178,6 @@ class causal_eval(object):
             fu6 = executor.submit(self.calculate_tdr_fdr, prompt6, self.fake_relations)  
         
             executor.shutdown()
-
             return {1: {"tdr": fu1.result()[0], "fdr": fu1.result()[1]}, 2: {"tdr": fu2.result()[0], "fdr": fu2.result()[1]}, 
                 3: {"tdr": fu3.result()[0], "fdr": fu3.result()[1]}, 4: {"tdr": fu4.result()[0], "fdr": fu4.result()[1]},
                 5: {"tdr": fu5.result()[0], "fdr": fu5.result()[1]}, 6: {"tdr": fu6.result()[0], "fdr": fu6.result()[1]}}  
@@ -210,6 +209,7 @@ class causal_eval(object):
                 try:
                     result = fut.result()
                 except Exception as exc:
+                    print(exc)
                     print("Exception happens")
                 else:
                     results.append(result)

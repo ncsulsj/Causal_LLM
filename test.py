@@ -76,11 +76,11 @@ class Jurassic(LLM):
         
         body = json.dumps({
         "prompt": "\n\nHuman: {}\n\nAssistant:".format(prompt),
-        "maxTokens": 200,
+        "maxTokens": 300,
         "temperature": 0,
-        "topP": 0.5
+        "topP": 0.9
         })
-        modelId = 'ai21.j2-mid-v1'
+        modelId = 'ai21.j2-ultra-v1'
         accept = 'application/json'
         contentType = 'application/json'
         response = brt.invoke_model(body=body, modelId=modelId, accept=accept, contentType=contentType)
@@ -97,7 +97,7 @@ class Llama2(LLM):
     def predict(self, prompt):
         body = json.dumps({
         "prompt":  "\n\nHuman: {}\n\nAssistant:".format(prompt),
-        "max_gen_len": 128,
+        "max_gen_len": 300,
         "temperature": 0,
         "top_p": 0.9,
         })
@@ -105,7 +105,6 @@ class Llama2(LLM):
         accept = 'application/json'
         contentType = 'application/json'
         response = brt.invoke_model(body=body, modelId=modelId, accept=accept, contentType=contentType)
-
         return json.loads(response.get('body').read())['generation']
 
 
@@ -113,17 +112,17 @@ class Llama2(LLM):
 def main():
 
     time1 = time.time()
-    sachs = pd.read_csv("sachs.txt", sep="\t")
+    d1 = pd.read_csv("pair0022.txt", sep=" ", names = ["Age", 'Height'])
+    d2 = pd.read_csv("pair0023.txt", sep=" ", names = ["Age", 'Weight']).drop(["Age"], axis = 1)
+    d3 = pd.read_csv("pair0024.txt", sep=" ", names = ["Age", 'Heart rate']).drop(["Age"], axis = 1)
+    dwd = pd.concat([d1, d2, d3], axis = 1).dropna()
 
-    relations = [("erk", "akt"), ("mek", "erk"), ("pip2", "pkc"), ("pip3", "akt"),
-                 ("pip3", "pip2"), ("pip3", "plc"), ("pka", "akt"), ("pka", "erk"), ("pka", "jnk"),
-                 ("pka", "mek"), ("pka", "p38"), ("pka", "raf"), ("pkc", "jnk"),
-                 ("pkc", "mek"), ("pkc", "p38"), ("pkc", "pka"), ("pkc", "raf"),
-                 ("plc", "pip2"), ("plc", "pkc"), ("raf", 'mek')]
+
+    relations = [("Age", "Height"), ("Age", "Weight"), ("Age", "Heart rate")]
     
-    Llm = Claude2()
+    Llm = GPT4()
 
-    eval = causal_eval(sachs, relations, Llm)
+    eval = causal_eval(dwd, relations, Llm)
 
     print(eval.evaluate(15, 8000, 0.5))
     time2 = time.time()
