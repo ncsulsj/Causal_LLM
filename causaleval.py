@@ -146,9 +146,9 @@ class causal_eval(object):
         return tdr and fdr through GPT-4 turbo
         """
         predicted_pairs = self.predict(prompt)
-        checked_pairs = check_error_pairs(format_string_to_list(predicted_pairs))
+        checked_pairs = check_error_pairs(format_string_to_list(predicted_pairs), self.nodes)
         if len(checked_pairs) == 0:
-            pred_adj_m = np.zeros((len(self.topo_order, len(self.topo_order))))
+            pred_adj_m = np.zeros((len(self.topo_order), len(self.topo_order)))
         else:
             predicted_nodes = set([node for pair in checked_pairs for node in pair])
             unpredicted_nodes = self.nodes - predicted_nodes

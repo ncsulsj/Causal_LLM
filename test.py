@@ -106,7 +106,6 @@ class Llama2(LLM):
         accept = 'application/json'
         contentType = 'application/json'
         response = brt.invoke_model(body=body, modelId=modelId, accept=accept, contentType=contentType)
-        print(json.loads(response.get('body').read())['generation'])
         return json.loads(response.get('body').read())['generation']
 
 
@@ -126,7 +125,7 @@ def main():
 
     eval = causal_eval(dwd, relations, Llm)
 
-    print(eval.evaluate(1, 8000, 0.5))
+    print(eval.evaluate(3, 8000, 0.5))
     time2 = time.time()
 
     print(time2 - time1)
