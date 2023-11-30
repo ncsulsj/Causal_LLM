@@ -5,6 +5,7 @@ Main function to evaluate the capability of LLMs to do causal discovery
 import networkx as nx 
 import pandas as pd 
 import tiktoken 
+from utils import *
 import numpy as np 
 from random import shuffle
 import openai 
@@ -39,6 +40,7 @@ class causal_eval(object):
         """
         self.input_data = input_data
         self.relations = relations 
+        self.nodes = set([node for relation in relations for node in relation])
         self.llm = llm 
         self.system = """
         You are a helpful assistant to suggest potential causal pairs with direction (A -> B means A causes B)
@@ -72,13 +74,13 @@ class causal_eval(object):
         create dataframe corresponding to reversed topological order and get the reversed causal relations
         """
         graph = nx.DiGraph(self.relations)
-        topo_order = list(nx.topological_sort(graph))
-        reversed_topo_order = list(reversed(topo_order))
-        adj_m = nx.adjacency_matrix(graph, nodelist = topo_order).todense()
-        pairs_index = np.nonzero(adj_m)
+        self.topo_order = list(nx.topological_sort(graph))
+        reversed_topo_order = list(reversed(self.topo_order))
+        self.adj_m = nx.adjacency_matrix(graph, nodelist = self.topo_order).todense()
+        pairs_index = np.nonzero(self.adj_m)
         reversed_relations = [reversed_topo_order[pair[0]] + " -> " + reversed_topo_order[pair[1]] 
                               for pair in zip(*pairs_index)]
-        reversed_data = self.input_data[topo_order]
+        reversed_data = self.input_data[self.topo_order]
         reversed_data.columns = reversed_topo_order
 
         return reversed_relations, reversed_data
@@ -120,32 +122,44 @@ class causal_eval(object):
         """
 
         return self.llm.predict(prompt)
+
+    def _calculate_F1(self, tdr, fdr):
+        """
+        :param tdr: true discovery rate for one time run 
+        :param fdr: false discovery rate for one time run
+
+        calculate the f1 score 
+        """  
+        return calculate_F1(tdr, fdr)
     
-    def calculate_tdr_fdr(self, prompt, true_pairs):
+    def _calculate_shd(self, correct, pred):
+        """
+        :param correct: true DAG 
+        :param pred: predicted DAG
+
+        calculate the structual hamming distance
+        """
+        return calculate_shd(correct, pred)
+    
+    def _calculate_tdr_fdr_shd(self, prompt, true_pairs):
         """
         return tdr and fdr through GPT-4 turbo
         """
         predicted_pairs = self.predict(prompt)
-        response = openai.ChatCompletion.create(
-                     model="gpt-4-1106-preview",
-                    messages=[{"role": "system", "content": "You are a helpful assistant to calculate True discovery rate and False discovery rate (Ignore small spelling error and Letter case issue)"},
-                    {"role": "user", "content": f"""
-                     Cacluate the true discovery rate and false discovery rate: \n Correct pairs: {true_pairs} \n Predicted pairs: {predicted_pairs}
-                    \n\n Return me with the floating point results true discovery rate and false discovery rate and don't give me the process of calculation.
-                     Using the answer template: Tdr: Fdr: 
-                     """
-                     }],
-                     temperature=0,
-                    )
-        answer = response["choices"][0]["message"]["content"]
-        pattern = r"\d+\.\d+"
-        match = re.findall(pattern, answer)
-        if len(match) == 0:
-
-            return 0, 1
+        checked_pairs = check_error_pairs(format_string_to_list(predicted_pairs))
+        if len(checked_pairs) == 0:
+            pred_adj_m = np.zeros((len(self.topo_order, len(self.topo_order))))
         else:
+            predicted_nodes = set([node for pair in checked_pairs for node in pair])
+            unpredicted_nodes = self.nodes - predicted_nodes
+            checked_pairs.extend([(node, node) for node in unpredicted_nodes])
+            predicted_graph = nx.DiGraph(checked_pairs)
+            pred_adj_m = nx.adjacency_matrix(predicted_graph, nodelist = self.topo_order).todense()
+            np.fill_diagonal(pred_adj_m, 0)
+        shd = self._calculate_shd(self.adj_m, pred_adj_m)
+        return calculate_tdr_fdr(predicted_pairs, true_pairs) + (shd,)
+    
 
-            return float(match[0]), float(match[1])
     
     def evaluate_once(self, i):
         """
@@ -170,27 +184,17 @@ class causal_eval(object):
         prompt6 = self.user_prompt.format(data = fake_cols)
 
         with ThreadPoolExecutor(max_workers = 3) as executor:
-            fu1 = executor.submit(self.calculate_tdr_fdr, prompt1, self.correct_relations)
-            fu2 = executor.submit(self.calculate_tdr_fdr, prompt2, self.correct_relations)
-            fu3 = executor.submit(self.calculate_tdr_fdr, prompt3, self.fake_relations)
-            fu4 = executor.submit(self.calculate_tdr_fdr, prompt4, self.reversed_relations)
-            fu5 = executor.submit(self.calculate_tdr_fdr, prompt4, self.correct_relations)
-            fu6 = executor.submit(self.calculate_tdr_fdr, prompt6, self.fake_relations)  
+            fu1 = executor.submit(self._calculate_tdr_fdr_shd, prompt1, self.correct_relations)
+            fu2 = executor.submit(self._calculate_tdr_fdr_shd, prompt2, self.correct_relations)
+            fu3 = executor.submit(self._calculate_tdr_fdr_shd, prompt3, self.fake_relations)
+            fu4 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.reversed_relations)
+            fu5 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.correct_relations)
+            fu6 = executor.submit(self._calculate_tdr_fdr_shd, prompt6, self.fake_relations)  
         
             executor.shutdown()
-            return {1: {"tdr": fu1.result()[0], "fdr": fu1.result()[1]}, 2: {"tdr": fu2.result()[0], "fdr": fu2.result()[1]}, 
-                3: {"tdr": fu3.result()[0], "fdr": fu3.result()[1]}, 4: {"tdr": fu4.result()[0], "fdr": fu4.result()[1]},
-                5: {"tdr": fu5.result()[0], "fdr": fu5.result()[1]}, 6: {"tdr": fu6.result()[0], "fdr": fu6.result()[1]}}  
-
-    def calculate_F1(self, tdr, fdr):
-        """
-        :param tdr: true discovery rate for one time run 
-        :param fdr: false discovery rate for one time run
-
-        calculate the f1 score 
-        """  
-        f1 = 2 * (1 - fdr) * tdr / (1 - fdr + tdr + 1e-5)
-        return f1
+            return {1: {"tdr": fu1.result()[0], "fdr": fu1.result()[1], "shd": fu1.result()[2]}, 2: {"tdr": fu2.result()[0], "fdr": fu2.result()[1], "shd": fu2.result()[2]}, 
+                3: {"tdr": fu3.result()[0], "fdr": fu3.result()[1], "shd": fu3.result()[2]}, 4: {"tdr": fu4.result()[0], "fdr": fu4.result()[1], "shd": fu4.result()[2]},
+                5: {"tdr": fu5.result()[0], "fdr": fu5.result()[1], "shd": fu5.result()[2]}, 6: {"tdr": fu6.result()[0], "fdr": fu6.result()[1], "shd": fu6.result()[2]}}  
         
     
     def evaluate(self, count, max_tokens, reserved_ratio = 0.8):
@@ -217,8 +221,9 @@ class causal_eval(object):
         for key in average_result.keys():
             average_result[key]["tdr"] = (np.mean([data[key]["tdr"] for data in results]), np.std([data[key]["tdr"] for data in results]))
             average_result[key]["fdr"] = (np.mean([data[key]["fdr"] for data in results]), np.std([data[key]["fdr"] for data in results]))
-            average_result[key]["F1"] = (np.mean([self.calculate_F1(data[key]["tdr"], data[key]["fdr"]) for data in results]),
-                                          np.std([self.calculate_F1(data[key]["tdr"], data[key]["fdr"]) for data in results]))
+            average_result[key]["F1"] = (np.mean([self._calculate_F1(data[key]["tdr"], data[key]["fdr"]) for data in results]),
+                                          np.std([self._calculate_F1(data[key]["tdr"], data[key]["fdr"]) for data in results]))
+            average_result[key]["shd"] = (np.mean([data[key]["shd"] for data in results]), np.std([data[key]["shd"] for data in results]))
         CAK = average_result[1]["tdr"][0] - average_result[3]["tdr"][0]
         CAD = average_result[1]["tdr"][0] - average_result[2]["tdr"][0]
         MAD = average_result[3]["tdr"][0] - average_result[6]["tdr"][0]

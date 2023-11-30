@@ -27,6 +27,7 @@ class LLM(ABC):
 
     def predict(self, prompt):
         raise NotImplementedError
+    
 
 class GPT4(LLM):
 
@@ -105,6 +106,7 @@ class Llama2(LLM):
         accept = 'application/json'
         contentType = 'application/json'
         response = brt.invoke_model(body=body, modelId=modelId, accept=accept, contentType=contentType)
+        print(json.loads(response.get('body').read())['generation'])
         return json.loads(response.get('body').read())['generation']
 
 
@@ -120,11 +122,11 @@ def main():
 
     relations = [("Age", "Height"), ("Age", "Weight"), ("Age", "Heart rate")]
     
-    Llm = GPT4()
+    Llm = Llama2()
 
     eval = causal_eval(dwd, relations, Llm)
 
-    print(eval.evaluate(15, 8000, 0.5))
+    print(eval.evaluate(1, 8000, 0.5))
     time2 = time.time()
 
     print(time2 - time1)
