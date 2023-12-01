@@ -55,17 +55,19 @@ class causal_eval(object):
         self.correct_relations = self.format_relations()
         self.reversed_relations, self.reversed_data = self.get_reversed_data()
         self.fake_relations, self.fake_data = self.fake_data_relation()
+        self.fake_nodes = set([self.fa_map[node] for node in self.nodes])
 
     def fake_data_relation(self):
         """
         create dataframe with columns as fake words and the corresponding correct directed relations
         """
-        fa_map = {}
+        self.fa_map = {}
         cols = self.input_data.columns.to_list()
         for faw, rew in zip(fake_words[:len(cols)], cols):
-            fa_map[rew] = faw
-        fake_relations = [fa_map[relation[0]] + " -> " + fa_map[relation[1]]for relation in self.relations]
-        fake_columns = [fa_map[name] for name in cols]
+            self.fa_map[rew] = faw
+        fake_relations = [self.fa_map[relation[0]] + " -> " + self.fa_map[relation[1]]for relation in self.relations]
+        self.fake_topo = [self.fa_map[node] for node in self.topo_order]
+        fake_columns = [self.fa_map[name] for name in cols]
         fake_data = deepcopy(self.input_data)
         fake_data.columns = fake_columns
 
@@ -143,20 +145,20 @@ class causal_eval(object):
         """
         return calculate_shd(correct, pred)
     
-    def _calculate_tdr_fdr_shd(self, prompt, true_pairs):
+    def _calculate_tdr_fdr_shd(self, prompt, true_pairs, fake):
         """
         return tdr and fdr through GPT-4 turbo
         """
         predicted_pairs = self.predict(prompt)
-        checked_pairs = check_error_pairs(format_string_to_list(predicted_pairs), self.nodes)
+        checked_pairs = check_error_pairs(format_string_to_list(predicted_pairs), self.fake_nodes if fake else self.nodes)
         if len(checked_pairs) == 0:
             pred_adj_m = np.zeros((len(self.topo_order), len(self.topo_order)))
         else:
             predicted_nodes = set([node for pair in checked_pairs for node in pair])
-            unpredicted_nodes = self.nodes - predicted_nodes
+            unpredicted_nodes = self.fake_nodes - predicted_nodes if fake else self.nodes - predicted_nodes
             checked_pairs.extend([(node, node) for node in unpredicted_nodes])
             predicted_graph = nx.DiGraph(checked_pairs)
-            pred_adj_m = nx.adjacency_matrix(predicted_graph, nodelist = self.topo_order).todense()
+            pred_adj_m = nx.adjacency_matrix(predicted_graph, nodelist = self.fake_topo if fake else self.topo_order).todense()
             np.fill_diagonal(pred_adj_m, 0)
         shd = self._calculate_shd(self.adj_m, pred_adj_m)
         return calculate_tdr_fdr(predicted_pairs, true_pairs) + (shd,)
@@ -216,12 +218,12 @@ class causal_eval(object):
         prompt6 = self.user_prompt.format(data = fake_cols)
 
         with ThreadPoolExecutor(max_workers = 3) as executor:
-            fu1 = executor.submit(self._calculate_tdr_fdr_shd, prompt1, self.correct_relations)
-            fu2 = executor.submit(self._calculate_tdr_fdr_shd, prompt2, self.correct_relations)
-            fu3 = executor.submit(self._calculate_tdr_fdr_shd, prompt3, self.fake_relations)
-            fu4 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.reversed_relations)
-            fu5 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.correct_relations)
-            fu6 = executor.submit(self._calculate_tdr_fdr_shd, prompt6, self.fake_relations)  
+            fu1 = executor.submit(self._calculate_tdr_fdr_shd, prompt1, self.correct_relations, fake = False)
+            fu2 = executor.submit(self._calculate_tdr_fdr_shd, prompt2, self.correct_relations, fake = False)
+            fu3 = executor.submit(self._calculate_tdr_fdr_shd, prompt3, self.fake_relations, fake = True)
+            fu4 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.reversed_relations, fake = False)
+            fu5 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.correct_relations, fake = False)
+            fu6 = executor.submit(self._calculate_tdr_fdr_shd, prompt6, self.fake_relations, fake = True)  
         
             executor.shutdown()
             return {1: {"tdr": fu1.result()[0], "fdr": fu1.result()[1], "shd": fu1.result()[2]}, 2: {"tdr": fu2.result()[0], "fdr": fu2.result()[1], "shd": fu2.result()[2]}, 

@@ -121,11 +121,12 @@ def main():
 
     relations = [("Age", "Height"), ("Age", "Weight"), ("Age", "Heart rate")]
     
-    Llm = Llama2()
+    Llm = GPT4()
 
     eval = causal_eval(dwd, relations, Llm)
 
-    print(eval.two_variable_evaluate(linear_coefficient= 2, df = 3, count=3, max_tokens=8000, reserved_ratio= 0.5))
+    # print(eval.two_variable_evaluate(linear_coefficient= 2, df = 3, count=20, max_tokens=8000, reserved_ratio= 0.5))
+    print(eval.evaluate(6, 8000, 0.5))
     time2 = time.time()
 
     print(time2 - time1)

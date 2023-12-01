@@ -138,7 +138,7 @@ def two_variable_comparision(llm, data, true):
     and if the residual is correlated with column B, we mark a YES in this case and a NO if not correlated
 
     If 1 is a YES and 2 is a NO, we say that B causes A; if 1 is a NO and 2 is a YES, we say that A causes B. \n
-    Following above instruction to derive causal pairs, suggest causal pairs with direction among following variables after analyzing following data::\n{}. \n MUST Suggest 
+    Following above instruction to suggest causal pairs with direction among following variables after analyzing following data:\n{}. \n MUST Suggest 
 ONLY the directed causal pairs without saying any other things:
     """.format(data.to_string())
 
