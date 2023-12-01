@@ -170,7 +170,10 @@ class causal_eval(object):
         cdm = lingam.ICALiNGAM(random_state = 42, max_iter = 100)
         cdm.fit(test_data)
         result["cdm"] = 1 if cdm.causal_order_ == [0, 1] else 0
-        result["llm"] = two_variable_comparision(self.llm, test_data, relation[1] + "->" + relation[0])
+        cols = test_data.columns.to_list()
+        shuffle(cols)
+        cur_data = test_data[cols]
+        result["llm"] = two_variable_comparision(self.llm, cur_data, relation[1] + "->" + relation[0])
         return result 
  
     def two_variable_evaluate(self, linear_coefficient, df, count, max_tokens, reserved_ratio = 0.8):
