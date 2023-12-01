@@ -116,3 +116,51 @@ def check_error_pairs(predicted_pairs, nodes):
     
     return pairs 
 
+
+def add_noise_to_data(data, dep, outcome, linear_coefficient, df):
+
+    data[outcome] = linear_coefficient * data[dep] + np.random.chisquare(df, size = (len(data),))
+
+    return data 
+
+
+
+def two_variable_comparision(llm, data, true):
+
+    prompt1 = """
+    Here is how LinGAM works to derive the causal pairs: 
+
+    Given the data with columns [A, B]: \n
+    
+    1. You first fit the linear regression with column A as the feature and B as the outcome variable. Collect the fitted residuals 
+    and if the residual is correlated with column A, we mark a YES in this case and a NO if not correlated
+    2. You then fit the linear regression with column B as the feature and A as the outcome variable. Collect the fitted residuals 
+    and if the residual is correlated with column B, we mark a YES in this case and a NO if not correlated
+
+    If 1 is a YES and 2 is a NO, we say that B causes A; if 1 is a NO and 2 is a YES, we say that A causes B. \n
+    Following above instruction to derive causal pairs, suggest causal pairs with direction among following variables after analyzing following data::\n{}. \n MUST Suggest 
+ONLY the directed causal pairs without saying any other things:
+    """.format(data.to_string())
+
+    prediction = llm.predict(prompt1)
+
+    prompt2 = """
+    Here is the predicted pair:{} and here is the correct pair {}.
+    If it is predicted correctly, return 1; if not, return 0;
+    ONLY RETURN ME THE NUMBER 1 or 0.
+    """.format(prediction, true)
+
+    result =  openai.ChatCompletion.create(
+    model="gpt-4-1106-preview",
+    messages=[{"role": "system", "content": "You are a helpful assistant to following the instruction"},
+    {"role": "user", "content": prompt2
+        }],
+        temperature=0,
+    )['choices'][0]['message']['content']
+
+    return int(result)
+
+
+    
+
+

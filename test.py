@@ -125,7 +125,7 @@ def main():
 
     eval = causal_eval(dwd, relations, Llm)
 
-    print(eval.evaluate(3, 8000, 0.5))
+    print(eval.two_variable_evaluate(linear_coefficient= 2, df = 3, count=3, max_tokens=8000, reserved_ratio= 0.5))
     time2 = time.time()
 
     print(time2 - time1)

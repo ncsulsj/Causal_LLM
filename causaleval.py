@@ -9,6 +9,7 @@ from utils import *
 import numpy as np 
 from random import shuffle
 import openai 
+import random 
 import re 
 from concurrent.futures import (
     ThreadPoolExecutor,
@@ -18,6 +19,7 @@ from concurrent.futures import (
 from typing import List, Tuple, Any
 from copy import deepcopy
 import os 
+from causallearn.search.FCMBased import lingam
 
 """
 word that does not exist in human language
@@ -159,6 +161,33 @@ class causal_eval(object):
         shd = self._calculate_shd(self.adj_m, pred_adj_m)
         return calculate_tdr_fdr(predicted_pairs, true_pairs) + (shd,)
     
+    def two_variable_evalute_once(self, linear_coefficient, df, i):
+        relation = random.choice(self.relations)
+        result = {}
+        dep, out = relation[1], relation[0]
+        test_data = self.input_data[[dep, out]]
+        test_data = add_noise_to_data(test_data, dep, out, linear_coefficient, df)
+        cdm = lingam.ICALiNGAM(random_state = 42, max_iter = 100)
+        cdm.fit(test_data)
+        result["cdm"] = 1 if cdm.causal_order_ == [0, 1] else 0
+        result["llm"] = two_variable_comparision(self.llm, test_data, relation[1] + "->" + relation[0])
+        return result 
+ 
+    def two_variable_evaluate(self, linear_coefficient, df, count, max_tokens, reserved_ratio = 0.8):
+        self.truncate_data(max_tokens, reserved_ratio)
+        results = []
+        with ProcessPoolExecutor(max_workers=3) as executor:
+            future_to_result = [executor.submit(self.two_variable_evalute_once, linear_coefficient, df, i) for i in range(count)]
+            for fut in as_completed(future_to_result):
+                try:
+                    result = fut.result()
+                except Exception as exc:
+                        print(exc)
+                        print("Exception happens")
+                else:
+                    results.append(result)
+        final_result = {"cdm":np.mean([result["cdm"]for result in results]), "llm":np.mean([result["llm"]for result in results])}
+        return final_result
 
     
     def evaluate_once(self, i):
@@ -230,3 +259,4 @@ class causal_eval(object):
         MAK = average_result[2]["tdr"][0] - average_result[6]["tdr"][0]
 
         return average_result, {"CAK": CAK, "CAD": CAD, "MAD": MAD, "MAK": MAK}
+    
