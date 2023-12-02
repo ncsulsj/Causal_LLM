@@ -145,7 +145,7 @@ class causal_eval(object):
         """
         return calculate_shd(correct, pred)
     
-    def _calculate_tdr_fdr_shd(self, prompt, true_pairs, fake):
+    def _calculate_tdr_fdr_shd(self, prompt, true_pairs, fake, reverse):
         """
         return tdr and fdr through GPT-4 turbo
         """
@@ -159,8 +159,10 @@ class causal_eval(object):
             checked_pairs.extend([(node, node) for node in unpredicted_nodes])
             predicted_graph = nx.DiGraph(checked_pairs)
             pred_adj_m = nx.adjacency_matrix(predicted_graph, nodelist = self.fake_topo if fake else self.topo_order).todense()
+            pred_adj_m_reverse = nx.adjacency_matrix(predicted_graph, nodelist = list(reversed(self.topo_order))).todense()
             np.fill_diagonal(pred_adj_m, 0)
-        shd = self._calculate_shd(self.adj_m, pred_adj_m)
+            np.fill_diagonal(pred_adj_m_reverse, 0)
+        shd = self._calculate_shd(self.adj_m, pred = pred_adj_m_reverse if reverse else pred_adj_m)
         return calculate_tdr_fdr(predicted_pairs, true_pairs) + (shd,)
     
     def two_variable_evalute_once(self, linear_coefficient, df, i):
@@ -218,12 +220,12 @@ class causal_eval(object):
         prompt6 = self.user_prompt.format(data = fake_cols)
 
         with ThreadPoolExecutor(max_workers = 3) as executor:
-            fu1 = executor.submit(self._calculate_tdr_fdr_shd, prompt1, self.correct_relations, fake = False)
-            fu2 = executor.submit(self._calculate_tdr_fdr_shd, prompt2, self.correct_relations, fake = False)
-            fu3 = executor.submit(self._calculate_tdr_fdr_shd, prompt3, self.fake_relations, fake = True)
-            fu4 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.reversed_relations, fake = False)
-            fu5 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.correct_relations, fake = False)
-            fu6 = executor.submit(self._calculate_tdr_fdr_shd, prompt6, self.fake_relations, fake = True)  
+            fu1 = executor.submit(self._calculate_tdr_fdr_shd, prompt1, self.correct_relations, fake = False, reverse = False)
+            fu2 = executor.submit(self._calculate_tdr_fdr_shd, prompt2, self.correct_relations, fake = False, reverse = False)
+            fu3 = executor.submit(self._calculate_tdr_fdr_shd, prompt3, self.fake_relations, fake = True, reverse = False)
+            fu4 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.reversed_relations, fake = False, reverse = True)
+            fu5 = executor.submit(self._calculate_tdr_fdr_shd, prompt4, self.correct_relations, fake = False, reverse = False)
+            fu6 = executor.submit(self._calculate_tdr_fdr_shd, prompt6, self.fake_relations, fake = True, reverse = False)  
         
             executor.shutdown()
             return {1: {"tdr": fu1.result()[0], "fdr": fu1.result()[1], "shd": fu1.result()[2]}, 2: {"tdr": fu2.result()[0], "fdr": fu2.result()[1], "shd": fu2.result()[2]}, 

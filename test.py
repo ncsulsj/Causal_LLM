@@ -113,20 +113,21 @@ class Llama2(LLM):
 def main():
 
     time1 = time.time()
-    d1 = pd.read_csv("pair0022.txt", sep=" ", names = ["Age", 'Height'])
-    d2 = pd.read_csv("pair0023.txt", sep=" ", names = ["Age", 'Weight']).drop(["Age"], axis = 1)
-    d3 = pd.read_csv("pair0024.txt", sep=" ", names = ["Age", 'Heart rate']).drop(["Age"], axis = 1)
-    dwd = pd.concat([d1, d2, d3], axis = 1).dropna()
+    galton = pd.read_csv(
+    "cmu.edu_dietrich_causality_assets_data_Galton_processed.txt", sep="\t")
+    data = galton.drop(['family'], axis=1)
+    data.columns = ["Father's Height",
+                "Mother's Height", "Gender", "Child's Height"]
 
-
-    relations = [("Age", "Height"), ("Age", "Weight"), ("Age", "Heart rate")]
+    relations = [("Father's Height", "Child's Height"), ("Mother's Height", "Child's Height"),
+                 ("Gender", "Child's Height")]
     
     Llm = GPT4()
 
-    eval = causal_eval(dwd, relations, Llm)
+    eval = causal_eval(data, relations, Llm)
 
     # print(eval.two_variable_evaluate(linear_coefficient= 2, df = 3, count=20, max_tokens=8000, reserved_ratio= 0.5))
-    print(eval.evaluate(6, 8000, 0.5))
+    print(eval.evaluate(15, 8000, 0.5))
     time2 = time.time()
 
     print(time2 - time1)
