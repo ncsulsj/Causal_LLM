@@ -113,20 +113,22 @@ class Llama2(LLM):
 def main():
 
     time1 = time.time()
-    d1 = pd.read_csv("pair0022.txt", sep=" ", names = ["Age", 'Height'])
-    d2 = pd.read_csv("pair0023.txt", sep=" ", names = ["Age", 'Weight']).drop(["Age"], axis = 1)
-    d3 = pd.read_csv("pair0024.txt", sep=" ", names = ["Age", 'Heart rate']).drop(["Age"], axis = 1)
-    dwd = pd.concat([d1, d2, d3], axis = 1).dropna()
+    sachs = pd.read_csv("sachs.txt", sep="\t")
 
 
-    relations = [("Age", "Height"), ("Age", "Weight"), ("Age", "Heart rate")]
+    relations = [("erk", "akt"), ("mek", "erk"), ("pip2", "pkc"),
+                 ("pip3", "akt"), ("pip3", "pip2"), ("pip3", "plc"),
+                 ("pka", "akt"), ("pka", "erk"), ("pka", "jnk"), ("pka", "mek"),
+                 ("pka", "p38"), ("pka", "raf"), ("pkc", "jnk"), ("pkc", "mek"),
+                 ("pkc", "p38"), ("pkc", "pka"), ("pkc", "raf"), ("plc", "pip2"),
+                 ("plc", "pkc"), ("raf", "mek")]
     
-    Llm = Llama2()
+    Llm = GPT4()
 
-    eval = causal_eval(dwd, relations, Llm)
+    eval = causal_eval(sachs, relations, Llm)
 
-    # print(eval.two_variable_evaluate(linear_coefficient= 2, df = 3, count=20, max_tokens=8000, reserved_ratio= 0.5))
-    print(eval.evaluate(15, 8000, 0.5))
+    print(eval.two_variable_evaluate(linear_coefficient= 2, df = 3, count=20, max_tokens=8000, reserved_ratio= 0.5))
+    # print(eval.evaluate(15, 8000, 0.5))
     time2 = time.time()
 
     print(time2 - time1)

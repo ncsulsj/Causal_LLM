@@ -178,7 +178,7 @@ class causal_eval(object):
         cols = test_data.columns.to_list()
         shuffle(cols)
         cur_data = test_data[cols]
-        result["llm"] = two_variable_comparision(self.llm, cur_data, relation[1] + "->" + relation[0])
+        result["llm"], result["llm_native"] = two_variable_comparision(self.llm, cur_data, relation[1] + "->" + relation[0])
         return result 
  
     def two_variable_evaluate(self, linear_coefficient, df, count, max_tokens, reserved_ratio = 0.8):
@@ -194,7 +194,8 @@ class causal_eval(object):
                         print("Exception happens")
                 else:
                     results.append(result)
-        final_result = {"cdm":np.mean([result["cdm"]for result in results]), "llm":np.mean([result["llm"]for result in results])}
+        final_result = {"cdm":np.mean([result["cdm"]for result in results]), "llm":np.mean([result["llm"]for result in results]),
+                        "llm_native": np.mean([result["llm_native"]for result in results])}
         return final_result
 
     

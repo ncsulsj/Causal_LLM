@@ -142,7 +142,14 @@ def two_variable_comparision(llm, data, true):
 ONLY the directed causal pairs without saying any other things:
     """.format(data.to_string())
 
+    prompt_native = """
+    suggest causal pairs with direction among following variables after analyzing following data:\n{}. \n MUST Suggest 
+    ONLY the directed causal pairs without saying any other things:
+    """.format(data.to_string())
+    
+
     prediction = llm.predict(prompt1)
+    prediction_native = llm.predict(prompt_native)
 
     prompt2 = """
     Here is the predicted pair:{} and here is the correct pair {}.
@@ -150,7 +157,13 @@ ONLY the directed causal pairs without saying any other things:
     ONLY RETURN ME THE NUMBER 1 or 0.
     """.format(prediction, true)
 
-    result =  openai.ChatCompletion.create(
+    prompt2_native = """
+    Here is the predicted pair:{} and here is the correct pair {}.
+    If it is predicted correctly, return 1; if not, return 0;
+    ONLY RETURN ME THE NUMBER 1 or 0.
+    """.format(prediction_native, true)
+
+    result1 =  openai.ChatCompletion.create(
     model="gpt-4-1106-preview",
     messages=[{"role": "system", "content": "You are a helpful assistant to following the instruction"},
     {"role": "user", "content": prompt2
@@ -158,7 +171,15 @@ ONLY the directed causal pairs without saying any other things:
         temperature=0,
     )['choices'][0]['message']['content']
 
-    return int(result)
+    result2 = openai.ChatCompletion.create(
+    model="gpt-4-1106-preview",
+    messages=[{"role": "system", "content": "You are a helpful assistant to following the instruction"},
+    {"role": "user", "content": prompt2_native
+        }],
+        temperature=0,
+    )['choices'][0]['message']['content']
+
+    return int(result1), int(result2)
 
 
     
