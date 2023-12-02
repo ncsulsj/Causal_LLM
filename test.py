@@ -37,7 +37,7 @@ class GPT4(LLM):
     def predict(self, prompt):
 
         response = openai.ChatCompletion.create(
-                     model="gpt-3.5-turbo",
+                     model="gpt-4-1106-preview",
                     messages=[{"role": "system", "content":  """
         You are a helpful assistant to suggest potential causal pairs with direction (A -> B means A causes B)
         """},
@@ -113,18 +113,17 @@ class Llama2(LLM):
 def main():
 
     time1 = time.time()
-    galton = pd.read_csv(
-    "cmu.edu_dietrich_causality_assets_data_Galton_processed.txt", sep="\t")
-    data = galton.drop(['family'], axis=1)
-    data.columns = ["Father's Height",
-                "Mother's Height", "Gender", "Child's Height"]
+    d1 = pd.read_csv("pair0022.txt", sep=" ", names = ["Age", 'Height'])
+    d2 = pd.read_csv("pair0023.txt", sep=" ", names = ["Age", 'Weight']).drop(["Age"], axis = 1)
+    d3 = pd.read_csv("pair0024.txt", sep=" ", names = ["Age", 'Heart rate']).drop(["Age"], axis = 1)
+    dwd = pd.concat([d1, d2, d3], axis = 1).dropna()
 
-    relations = [("Father's Height", "Child's Height"), ("Mother's Height", "Child's Height"),
-                 ("Gender", "Child's Height")]
+
+    relations = [("Age", "Height"), ("Age", "Weight"), ("Age", "Heart rate")]
     
-    Llm = GPT4()
+    Llm = Llama2()
 
-    eval = causal_eval(data, relations, Llm)
+    eval = causal_eval(dwd, relations, Llm)
 
     # print(eval.two_variable_evaluate(linear_coefficient= 2, df = 3, count=20, max_tokens=8000, reserved_ratio= 0.5))
     print(eval.evaluate(15, 8000, 0.5))

@@ -159,10 +159,11 @@ class causal_eval(object):
             checked_pairs.extend([(node, node) for node in unpredicted_nodes])
             predicted_graph = nx.DiGraph(checked_pairs)
             pred_adj_m = nx.adjacency_matrix(predicted_graph, nodelist = self.fake_topo if fake else self.topo_order).todense()
-            pred_adj_m_reverse = nx.adjacency_matrix(predicted_graph, nodelist = list(reversed(self.topo_order))).todense()
+            pred_adj_m_reverse = nx.adjacency_matrix(predicted_graph, nodelist = list(reversed(self.topo_order))).todense() \
+                                if reverse else np.zeros((len(self.topo_order), len(self.topo_order)))
             np.fill_diagonal(pred_adj_m, 0)
             np.fill_diagonal(pred_adj_m_reverse, 0)
-        shd = self._calculate_shd(self.adj_m, pred = pred_adj_m_reverse if reverse else pred_adj_m)
+        shd = self._calculate_shd(self.adj_m,   pred = pred_adj_m_reverse if reverse else pred_adj_m)
         return calculate_tdr_fdr(predicted_pairs, true_pairs) + (shd,)
     
     def two_variable_evalute_once(self, linear_coefficient, df, i):
