@@ -153,6 +153,7 @@ class causal_eval(object):
         checked_pairs = check_error_pairs(format_string_to_list(predicted_pairs), self.fake_nodes if fake else self.nodes)
         if len(checked_pairs) == 0:
             pred_adj_m = np.zeros((len(self.topo_order), len(self.topo_order)))
+            pred_adj_m_reverse = np.zeros((len(self.topo_order), len(self.topo_order)))
         else:
             predicted_nodes = set([node for pair in checked_pairs for node in pair])
             unpredicted_nodes = self.fake_nodes - predicted_nodes if fake else self.nodes - predicted_nodes
