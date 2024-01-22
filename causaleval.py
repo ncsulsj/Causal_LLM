@@ -263,10 +263,19 @@ class causal_eval(object):
             average_result[key]["F1"] = (np.mean([self._calculate_F1(data[key]["tdr"], data[key]["fdr"]) for data in results]),
                                           np.std([self._calculate_F1(data[key]["tdr"], data[key]["fdr"]) for data in results]))
             average_result[key]["shd"] = (np.mean([data[key]["shd"] for data in results]), np.std([data[key]["shd"] for data in results]))
-        CAK = average_result[1]["tdr"][0] - average_result[3]["tdr"][0]
-        CAD = average_result[1]["tdr"][0] - average_result[2]["tdr"][0]
-        MAD = average_result[3]["tdr"][0] - average_result[6]["tdr"][0]
-        MAK = average_result[2]["tdr"][0] - average_result[6]["tdr"][0]
+        
+        # CAK = average_result[1]["tdr"][0] - average_result[3]["tdr"][0]
+        # CAD = average_result[1]["tdr"][0] - average_result[2]["tdr"][0]
+        # MAD = average_result[3]["tdr"][0] - average_result[6]["tdr"][0]
+        # MAK = average_result[2]["tdr"][0] - average_result[6]["tdr"][0]
+        CAK_data = [ data[1]['tdr'] - data[3]['tdr'] for data in results]
+        CAK = (np.mean(CAK_data), np.std(CAK_data))
+        CAD_data = [ data[1]['tdr'] - data[2]['tdr'] for data in results]
+        CAD = (np.mean(CAD_data), np.std(CAD_data))
+        MAD_data = [ data[3]['tdr'] - data[6]['tdr'] for data in results]
+        MAD = (np.mean(MAD_data), np.std(MAD_data))
+        MAK_data = [ data[2]['tdr'] - data[6]['tdr'] for data in results]
+        MAK = (np.mean(MAK_data), np.std(MAK_data))    
 
         return average_result, {"CAK": CAK, "CAD": CAD, "MAD": MAD, "MAK": MAK}
     
