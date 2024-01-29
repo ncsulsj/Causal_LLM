@@ -5,7 +5,7 @@ Main function to evaluate the capability of LLMs to do causal discovery
 import networkx as nx 
 import pandas as pd 
 import tiktoken 
-from utils import *
+from src.utils import *
 import numpy as np 
 from random import shuffle
 import openai 

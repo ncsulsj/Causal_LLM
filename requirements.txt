@@ -1,0 +1,10 @@
+# Recommend to use conda environments 
+# need to be in python version >= 3.10.0
+
+networkx
+python-dotenv
+openai==0.28.0
+boto3
+tiktoken 
+causal-learn
+

@@ -1,8 +1,8 @@
 """
-Script to test GPT-3.5 or GPT-4
+Script to test the capability of LLMs for causal discovery 
 """
 
-from causaleval import *
+from src.causaleval import *
 import time 
 from dotenv import load_dotenv
 import warnings
@@ -10,7 +10,9 @@ import argparse
 import boto3
 import json
 from abc import ABC
+import argparse
 warnings.filterwarnings("ignore")
+import ast 
 
 
 load_dotenv()
@@ -18,7 +20,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 brt = boto3.client(service_name='bedrock-runtime', region_name = "us-east-1")
 
 
-### Add argument parser here is necessary (define the system prompt)
+### Add Logger here is necessary (define the system prompt)
 
 class LLM(ABC): 
 
@@ -31,13 +33,13 @@ class LLM(ABC):
 
 class GPT4(LLM):
 
-    def __init__(self):
-        pass
+    def __init__(self, model_name):
+        self.model_name = model_name
 
     def predict(self, prompt):
 
         response = openai.ChatCompletion.create(
-                     model="gpt-4-1106-preview",
+                     model= self.model_name,
                     messages=[{"role": "system", "content":  """
         You are a helpful assistant to suggest potential causal pairs with direction (A -> B means A causes B)
         """},
@@ -108,30 +110,64 @@ class Llama2(LLM):
         response = brt.invoke_model(body=body, modelId=modelId, accept=accept, contentType=contentType)
         return json.loads(response.get('body').read())['generation']
 
+def parse_args():
 
+    parser = argparse.ArgumentParser(description= "Evaluate the capability of LLMs on the causal discovery task")
+
+    parser.add_argument("--llm", type=str, default="gpt4", help="The LLM to be evaluated")
+    parser.add_argument("--data", type=str, default="/home/acrl_server/jing/finetune_llama/Causal_LLM/data/sachs.txt", help="The path of the dataset to be used")
+    parser.add_argument("--relations", type = str, default = "/home/acrl_server/jing/finetune_llama/Causal_LLM/relation/relation.txt", help = "The true relations to be evalutaed")
+    parser.add_argument("--task_type", type = str, default = "two_variable_discovery", help = "The type of task to be evaluated")
+    parser.add_argument("--linear_coefficient", type = float, default = 1, help = "The linear coefficient in the simulation model of pairwise causal discovery")
+    parser.add_argument("--df", type = int, default = 3, help = "The degree of freedom in the simulation model of pairwise causal discovery")
+    parser.add_argument("--count", type = int, default = 2, help = "The number of trials to be evaluated")
+    parser.add_argument("--max_tokens", type = int, default = 8000, help = "The maximum number of tokens to be used in the evaluation")
+    parser.add_argument("--reserved_ratio", type = float, default = 0.5, help = "The ratio of reserved tokens in the evaluation")
+    parser.add_argument("--model_name", type = str, default = "gpt-4-1106-preview", help = "The name of the LLM to be evaluated")
+
+    args = parser.parse_args()
+
+    return args
 
 def main():
 
-    time1 = time.time()
-    sachs = pd.read_csv("sachs.txt", sep="\t")
-
-
-    relations = [("erk", "akt"), ("mek", "erk"), ("pip2", "pkc"),
-                 ("pip3", "akt"), ("pip3", "pip2"), ("pip3", "plc"),
-                 ("pka", "akt"), ("pka", "erk"), ("pka", "jnk"), ("pka", "mek"),
-                 ("pka", "p38"), ("pka", "raf"), ("pkc", "jnk"), ("pkc", "mek"),
-                 ("pkc", "p38"), ("pkc", "pka"), ("pkc", "raf"), ("plc", "pip2"),
-                 ("plc", "pkc"), ("raf", "mek")]
+    args = parse_args()
+    start_time = time.time()
+    print("Evaluation Begins ====================== >>>> ")
+    try:
+        eval_data = pd.read_csv(args.data, sep= "\t")
+    except Exception as e:
+        print("A data import error occured:", str(e))
+    try:
+        with open(args.relations, "r") as file:
+            relations = ast.literal_eval(file.read())
+    except Exception as e:
+        print("A relation import error occured:", str(e)) 
     
-    Llm = GPT4()
+    match args.llm:
+        case "gpt4":
+            Llm = GPT4(args.model_name)
+        case "claude2":
+            Llm = Claude2()
+        case "jurassic":
+            Llm = Jurassic()
+        case "llama2":
+            Llm = Llama2()
+        case _:
+            raise ValueError("The LLM is not supported")
+        
+    eval = causal_eval(eval_data, relations, Llm)
 
-    eval = causal_eval(sachs, relations, Llm)
+    if args.task_type == "full_graph_discovery":
+        print(eval.evaluate(args.count, args.max_tokens, args.reserved_ratio))
+    elif args.task_type == "two_variable_discovery":
+        print(eval.two_variable_evaluate(linear_coefficient= args.linear_coefficient, df = args.df, count=args.count, max_tokens=args.max_tokens, reserved_ratio= args.reserved_ratio))
+    else:
+        raise ValueError("The task type is not supported")
+    
+    end_time = time.time()
 
-    print(eval.two_variable_evaluate(linear_coefficient= 2, df = 3, count=20, max_tokens=8000, reserved_ratio= 0.5))
-    # print(eval.evaluate(15, 8000, 0.5))
-    time2 = time.time()
-
-    print(time2 - time1)
+    print("The evaluation time spends: " + str(end_time - start_time))
 
 
 if __name__ == "__main__":
