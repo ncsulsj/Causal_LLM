@@ -117,7 +117,7 @@ def parse_args():
     parser.add_argument("--llm", type=str, default="gpt4", help="The LLM to be evaluated")
     parser.add_argument("--data", type=str, default="./data/sachs.txt", help="The path of the dataset to be used")
     parser.add_argument("--relations", type = str, default = "./relation/relation.txt", help = "The true relations to be evalutaed")
-    parser.add_argument("--task_type", type = str, default = "two_variable_discovery", help = "The type of task to be evaluated")
+    parser.add_argument("--task_type", type = str, default = "full_graph_discovery", help = "The type of task to be evaluated")
     parser.add_argument("--linear_coefficient", type = float, default = 1, help = "The linear coefficient in the simulation model of pairwise causal discovery")
     parser.add_argument("--df", type = int, default = 3, help = "The degree of freedom in the simulation model of pairwise causal discovery")
     parser.add_argument("--count", type = int, default = 2, help = "The number of trials to be evaluated")
